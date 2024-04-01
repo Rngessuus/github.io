@@ -1,0 +1,174 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sun Mar 31 15:09:45 2024
+
+@author: rnges
+"""
+
+class User:
+    def __init__(self, username, password):
+        self.username = username
+        self.password = password
+
+    def authenticate(self, username, password):
+        return self.username == username and self.password == password
+
+
+class Flight:
+    def __init__(self, flight_number, departure, destination, departure_time, arrival_time, capacity, price):
+        self.flight_number = flight_number
+        self.departure = departure
+        self.destination = destination
+        self.departure_time = departure_time
+        self.arrival_time = arrival_time
+        self.capacity = capacity
+        self.price = price
+        self.passenger_list = []
+
+    def available_seats(self):
+        return self.capacity - len(self.passenger_list)
+
+    def book_flight(self, passenger_name):
+        if self.available_seats() > 0:
+            self.passenger_list.append(passenger_name)
+            return True
+        else:
+            return False
+
+    def cancel_reservation(self, passenger_name):
+        if passenger_name in self.passenger_list:
+            self.passenger_list.remove(passenger_name)
+            return True
+        else:
+            return False
+
+    def get_passenger_list(self):
+        return self.passenger_list
+
+    def __str__(self):
+        return f"Flight {self.flight_number}: {self.departure} to {self.destination}, Departure: {self.departure_time}, Arrival: {self.arrival_time}, Price: ${self.price}"
+
+
+class FlightReservationSystem:
+    def __init__(self):
+        self.flights = []
+        self.users = []
+
+    def add_user(self, user):
+        self.users.append(user)
+
+    def authenticate_user(self, username, password):
+        for user in self.users:
+            if user.authenticate(username, password):
+                return True
+        return False
+
+    def add_flight(self, flight_number, departure, destination, departure_time, arrival_time, capacity, price):
+        new_flight = Flight(flight_number, departure, destination, departure_time, arrival_time, capacity, price)
+        self.flights.append(new_flight)
+        self.save_flights()  # Save flights after adding a new flight
+        return f"Flight {flight_number} added successfully."
+
+    def find_flights(self, departure=None, destination=None, departure_time=None, price_range=None):
+        found_flights = []
+        for flight in self.flights:
+            if (departure is None or flight.departure.lower() == departure.lower()) and \
+                    (destination is None or flight.destination.lower() == destination.lower()) and \
+                    (departure_time is None or flight.departure_time == departure_time) and \
+                    (price_range is None or (price_range[0] <= flight.price <= price_range[1])):
+                found_flights.append(flight)
+        return found_flights
+
+    def make_reservation(self, flight_number, passenger_name, username, password):
+        if not self.authenticate_user(username, password):
+            return "Authentication failed. Please provide valid credentials."
+
+        for flight in self.flights:
+            if flight.flight_number == flight_number:
+                if flight.book_flight(passenger_name):
+                    self.save_flights()  # Save flights after making reservation
+                    return f"Reservation successful for Flight {flight_number}."
+                else:
+                    return f"Sorry, no available seats for Flight {flight_number}."
+        return f"Flight {flight_number} not found."
+
+    def cancel_reservation(self, flight_number, passenger_name, username, password):
+        if not self.authenticate_user(username, password):
+            return "Authentication failed. Please provide valid credentials."
+
+        for flight in self.flights:
+            if flight.flight_number == flight_number:
+                if flight.cancel_reservation(passenger_name):
+                    self.save_flights()  # Save flights after canceling reservation
+                    return f"Reservation canceled for Flight {flight_number}."
+                else:
+                    return f"Passenger {passenger_name} not found in Flight {flight_number} reservations."
+        return f"Flight {flight_number} not found."
+
+    def view_reservations(self, username, password):
+        if not self.authenticate_user(username, password):
+            return "Authentication failed. Please provide valid credentials."
+
+        reservations = []
+        for flight in self.flights:
+            passenger_list = flight.get_passenger_list()
+            if username in passenger_list:
+                reservations.append(flight)
+        if reservations:
+            return "Your reservations:\n" + "\n".join(map(str, reservations))
+        else:
+            return "You have no reservations."
+
+    def display_flights(self, flights):
+        if flights:
+            for flight in flights:
+                print(flight)
+        else:
+            print("No flights found.")
+
+    def save_flights(self):
+        with open("flights.txt", "w") as file:
+            for flight in self.flights:
+                file.write(f"{flight.flight_number},{flight.departure},{flight.destination},{flight.departure_time},{flight.arrival_time},{flight.capacity},{flight.price}\n")
+
+    def load_flights(self):
+        try:
+            with open("flights.txt", "r") as file:
+                for line in file:
+                    flight_data = line.strip().split(",")
+                    flight = Flight(*flight_data)
+                    self.flights.append(flight)
+        except FileNotFoundError:
+            pass
+
+
+# Example usage
+if __name__ == "__main__":
+    # Initialize the flight reservation system and load flights
+    flight_system = FlightReservationSystem()
+    flight_system.load_flights()
+
+    # Add some users
+    user1 = User("user1", "password1")
+    user2 = User("user2", "password2")
+    flight_system.add_user(user1)
+    flight_system.add_user(user2)
+
+    # Add some flights if the system is empty
+    if not flight_system.flights:
+        flight_system.add_flight("ABC123", "New York", "Los Angeles", "09:00", "12:00", 150, 200)
+        flight_system.add_flight("DEF456", "Los Angeles", "New York", "14:00", "17:00", 180, 220)
+        flight_system.add_flight("GHI789", "Chicago", "Miami", "11:00", "14:00", 200, 250)
+
+    # Display available flights from New York to Los Angeles
+    print("Available flights from New York to Los Angeles:")
+    available_flights = flight_system.find_flights(departure="New York", destination="Los Angeles")
+    flight_system.display_flights(available_flights)
+
+    # Add a new flight
+    print("\nAdding a new flight:")
+    print(flight_system.add_flight("JKL012", "Los Angeles", "Chicago", "15:00", "17:00", 180, 220))
+
+    # Display all flights
+    print("\nAll flights:")
+    flight_system.display_flights(flight_system.flights)
